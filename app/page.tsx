@@ -15,6 +15,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertCircle,
   CheckCircle,
   Clock,
@@ -64,6 +72,9 @@ interface ScannerState {
   scanStatus: "idle" | "scanning" | "completed";
   findings: Finding[];
   securityScore: number;
+
+  // Selected model
+  selectedModel: string;
 }
 
 // Define the initial state
@@ -74,6 +85,7 @@ const initialState: ScannerState = {
   scanStatus: "idle",
   findings: [],
   securityScore: 0,
+  selectedModel: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
 };
 
 // Define consolidated action types with consistent payload pattern
@@ -96,6 +108,10 @@ type ScannerAction =
   | {
       type: ActionType.URL_CHANGED;
       url: string;
+    }
+  | {
+      type: ActionType.FINDING;
+      model: string;
     };
 
 // Define the reducer function with consolidated actions
@@ -170,6 +186,12 @@ function scannerReducer(
       }
       return state;
 
+    case ActionType.FINDING:
+      return {
+        ...state,
+        selectedModel: action.model,
+      };
+
     case ActionType.RESET:
       return {
         ...initialState,
@@ -192,6 +214,7 @@ export default function SecurityScannerPage() {
     securityScore,
     runAttempted,
     lastServerUrl,
+    selectedModel,
   } = state;
 
   // Derived state
@@ -247,6 +270,11 @@ export default function SecurityScannerPage() {
     dispatch({ type: ActionType.URL_CHANGED, url });
   };
 
+  // Handle model change
+  const handleModelChange = (value: string) => {
+    dispatch({ type: ActionType.FINDING, model: value });
+  };
+
   // Test connection to server
   const handleTestConnection = async () => {
     // Get the server URL and API key from the form
@@ -269,7 +297,11 @@ export default function SecurityScannerPage() {
 
     try {
       // Test the connection using our server action
-      const result = await testMCPConnection(serverUrl, apiKey || "");
+      const result = await testMCPConnection(
+        serverUrl,
+        selectedModel,
+        apiKey || ""
+      );
 
       if (result.success) {
         toast.success("Connection successful!");
@@ -322,7 +354,11 @@ export default function SecurityScannerPage() {
 
     try {
       // Run the security assessment using our agent-based approach
-      const result = await runAgentAssessment(serverUrl, apiKey || "");
+      const result = await runAgentAssessment(
+        serverUrl,
+        selectedModel,
+        apiKey || ""
+      );
 
       if (result.success) {
         // Update findings and complete the scan
@@ -398,34 +434,6 @@ export default function SecurityScannerPage() {
               />
             </div>
 
-            {/* <div className="space-y-2">
-              <Label>Authentication Method</Label>
-              <RadioGroup
-                defaultValue="api-key"
-                className="grid grid-cols-3 gap-4"
-                disabled={isScanning || scanComplete}
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="api-key" id="api-key" />
-                  <Label htmlFor="api-key" className="font-normal">
-                    API Key
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="oauth" id="oauth" />
-                  <Label htmlFor="oauth" className="font-normal">
-                    OAuth 2.0
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="bearer" id="bearer" />
-                  <Label htmlFor="bearer" className="font-normal">
-                    Bearer Token
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div> */}
-
             <div className="space-y-2">
               <Label htmlFor="api-key-input">API Key</Label>
               <Input
@@ -436,36 +444,49 @@ export default function SecurityScannerPage() {
               />
             </div>
 
-            {/* <div className="space-y-2">
-              <Label>Tool Descriptions</Label>
-              <div className="flex items-center justify-center w-full">
-                <label
-                  htmlFor="tool-file"
-                  className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-7 hover:bg-gray-6 dark:bg-gray-2 dark:hover:bg-gray-3 ${
-                    isScanning || scanComplete
-                      ? "opacity-50 pointer-events-none"
-                      : ""
-                  }`}
-                >
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <Upload className="w-8 h-8 mb-2 text-gray-4" />
-                    <p className="mb-2 text-sm text-gray-4">
-                      <span className="font-semibold">Click to upload</span> or
-                      drag and drop
-                    </p>
-                    <p className="text-xs text-gray-4">
-                      JSON, YAML, or OpenAPI (Max 10MB)
-                    </p>
-                  </div>
-                  <Input
-                    id="tool-file"
-                    type="file"
-                    className="hidden"
-                    disabled={isScanning || scanComplete}
-                  />
-                </label>
-              </div>
-            </div> */}
+            <div className="space-y-2">
+              <Label htmlFor="model-select">LLM Model</Label>
+              <Select
+                value={selectedModel}
+                onValueChange={handleModelChange}
+                disabled={isScanning || scanComplete}
+              >
+                <SelectTrigger id="model-select">
+                  <SelectValue placeholder="Select a model" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="@cf/meta/llama-3.1-8b-instruct-fast">
+                      Llama 3.1 8B Instruct Fast
+                    </SelectItem>
+                    <SelectItem value="@cf/meta/llama-3.1-70b-instruct">
+                      Llama 3.1 70B Instruct
+                    </SelectItem>
+                    <SelectItem value="@cf/meta/llama-3.3-70b-instruct-fp8-fast">
+                      Llama 3.3 70B Instruct FP8 Fast
+                    </SelectItem>
+                    <SelectItem value="@cf/meta/llama-3-8b-instruct">
+                      Llama 3 8B Instruct
+                    </SelectItem>
+                    <SelectItem value="@cf/meta/llama-3.1-8b-instruct">
+                      Llama 3.1 8B Instruct
+                    </SelectItem>
+                    <SelectItem value="@cf/meta/llama-3.2-11b-vision-instruct">
+                      Llama 3.2 11B Vision Instruct
+                    </SelectItem>
+                    <SelectItem value="@hf/nousresearch/hermes-2-pro-mistral-7b">
+                      Hermes 2 Pro Mistral 7B
+                    </SelectItem>
+                    <SelectItem value="@hf/thebloke/deepseek-coder-6.7b-instruct-awq">
+                      DeepSeek Coder 6.7B Instruct AWQ
+                    </SelectItem>
+                    <SelectItem value="@cf/deepseek-ai/deepseek-r1-distill-qwen-32b">
+                      DeepSeek R1 Distill Qwen 32B
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="context">Additional Context</Label>
@@ -560,12 +581,20 @@ export default function SecurityScannerPage() {
                 <CardTitle className="text-sm font-medium">
                   Overall Security Score
                 </CardTitle>
-                <Shield className="h-4 w-4 text-success" />
+                {securityScore >= 70 ? (
+                  <ShieldCheck className="h-4 w-4 text-success" />
+                ) : securityScore >= 40 ? (
+                  <Shield className="h-4 w-4 text-warning" />
+                ) : (
+                  <ShieldAlert className="h-4 w-4 text-error" />
+                )}
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{securityScore}/100</div>
                 <p className="text-xs text-muted-foreground">
-                  Good security posture
+                  {securityScore >= 70
+                    ? "Good security posture"
+                    : "Needs improvement"}
                 </p>
               </CardContent>
             </Card>
@@ -579,11 +608,28 @@ export default function SecurityScannerPage() {
               <CardContent>
                 <div className="text-2xl font-bold">{findings.length}</div>
                 <p className="text-xs text-muted-foreground">
-                  {findings.filter((f) => f.severity === "Critical").length}{" "}
+                  {
+                    findings.filter(
+                      (f) => f.severity.toLowerCase() === "critical"
+                    ).length
+                  }{" "}
                   critical,{" "}
-                  {findings.filter((f) => f.severity === "High").length} high,{" "}
-                  {findings.filter((f) => f.severity === "Medium").length}{" "}
-                  medium
+                  {
+                    findings.filter((f) => f.severity.toLowerCase() === "high")
+                      .length
+                  }{" "}
+                  high,{" "}
+                  {
+                    findings.filter(
+                      (f) => f.severity.toLowerCase() === "medium"
+                    ).length
+                  }{" "}
+                  medium,{" "}
+                  {
+                    findings.filter((f) => f.severity.toLowerCase() === "low")
+                      .length
+                  }{" "}
+                  low
                 </p>
               </CardContent>
             </Card>
@@ -595,16 +641,55 @@ export default function SecurityScannerPage() {
                 <ShieldCheck className="h-4 w-4 text-primary" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">8</div>
-                <p className="text-xs text-muted-foreground">
-                  3 secure, 5 vulnerable
-                </p>
+                {(() => {
+                  // Get unique tool names from findings - these are the vulnerable ones
+                  const vulnerableToolNames = [
+                    ...new Set(findings.map((f) => f.toolName)),
+                  ];
+                  const vulnerableCount = vulnerableToolNames.length;
+
+                  // Get the total tool count from the combined result - this should be passed in the assessment result
+                  // For now we're using the metadata stored in the first finding's id
+                  // Extract the total tool count from findings metadata if possible
+                  let totalTools = 0;
+
+                  if (findings.length > 0) {
+                    // Try to get tool count from custom metadata - format is now 'ti-X-Y-Z'
+                    // where Z is the total number of tools
+                    const findingId = findings[0].id;
+                    const match = findingId.match(/^(?:ti|pi)-\d+-\d+-(\d+)/);
+                    if (match && match[1]) {
+                      totalTools = Number(match[1]);
+                    }
+
+                    // Ensure we have at least as many tools as we have unique vulnerable tools
+                    totalTools = Math.max(totalTools, vulnerableCount);
+                  }
+
+                  // If we couldn't determine the total, use the vulnerable count
+                  if (totalTools === 0) {
+                    totalTools = vulnerableCount;
+                  }
+
+                  const secureCount = totalTools - vulnerableCount;
+
+                  return (
+                    <>
+                      <div className="text-2xl font-bold">{totalTools}</div>
+                      <p className="text-xs text-muted-foreground">
+                        {totalTools === 0
+                          ? "0 secure, 0 vulnerable"
+                          : `${secureCount} secure, ${vulnerableCount} vulnerable`}
+                      </p>
+                    </>
+                  );
+                })()}
               </CardContent>
             </Card>
           </div>
 
           <div className="space-y-6">
-            <Card>
+            {/* <Card>
               <CardHeader>
                 <CardTitle>Vulnerability Overview</CardTitle>
                 <CardDescription>
@@ -669,7 +754,7 @@ export default function SecurityScannerPage() {
                   </div>
                 </div>
               </CardContent>
-            </Card>
+            </Card> */}
 
             <Card>
               <CardHeader>

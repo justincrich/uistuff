@@ -5,13 +5,10 @@ import {
   Finding,
   InspectorCheckRequest,
   InspectorAnalysisRequest,
-  ToolsResponse,
   InspectorCheckResponseSchema,
-  VulnerabilityToolResponseSchema,
   ToolsWithVulnerabilitySchema,
   VulnerabilityFinding,
 } from "@/schemas";
-import { parseDirtyJSONWithLLM } from "@/lib/parseDirtyJSONWithLLM";
 
 // Define the return type for our test connection function
 type TestConnectionResult = {
@@ -29,19 +26,22 @@ type TestConnectionResult = {
  */
 export async function testMCPConnection(
   serverUrl: string,
+  model: string,
   apiKey?: string
 ): Promise<TestConnectionResult> {
   console.log("=== MCP Connection Test Started ===");
   console.log(`Server URL: ${serverUrl}`);
   console.log(`API Key provided: ${apiKey ? "Yes" : "No"}`);
+  console.log(`Model: ${model}`);
 
   try {
     // Use the /inspect/test endpoint to test the connection
-    const requestBody: InspectorCheckRequest = {
+    const requestBody = {
       url: serverUrl,
-      analysisType: "tool_injection",
+      analysisType: "tool_injection" as const,
+      model,
       ...(apiKey && { bearer: apiKey }),
-    };
+    } as InspectorCheckRequest;
 
     console.log(
       `Sending request to inspector/check endpoint: ${JSON.stringify({
@@ -142,11 +142,13 @@ export async function testMCPConnection(
  */
 export async function runAgentAssessment(
   serverUrl: string,
+  model: string,
   apiKey?: string
 ): Promise<AssessmentResult> {
   console.log("=== MCP Agent-based Security Assessment Started ===");
   console.log(`Server URL: ${serverUrl}`);
   console.log(`API Key provided: ${apiKey ? "Yes" : "No"}`);
+  console.log(`Model: ${model}`);
 
   try {
     // Set up headers for all requests
@@ -156,11 +158,12 @@ export async function runAgentAssessment(
 
     // First run a basic security check
     console.log("Running basic security check...");
-    const checkRequestBody: InspectorCheckRequest = {
+    const checkRequestBody = {
       url: serverUrl,
-      analysisType: "tool_injection",
+      analysisType: "tool_injection" as const,
+      model,
       ...(apiKey && { bearer: apiKey }),
-    };
+    } as InspectorCheckRequest;
 
     console.log(
       `Sending check request: ${JSON.stringify({
@@ -213,11 +216,12 @@ export async function runAgentAssessment(
 
     // Then run detailed inspections for tool injection
     console.log("Running tool injection inspection...");
-    const toolInjectionRequestBody: InspectorAnalysisRequest = {
+    const toolInjectionRequestBody = {
       url: serverUrl,
+      model,
+      analysisType: "tool_injection" as const,
       ...(apiKey && { bearer: apiKey }),
-      analysisType: "tool_injection",
-    };
+    } as InspectorAnalysisRequest;
 
     console.log(
       `Sending tool injection request: ${JSON.stringify({
@@ -248,15 +252,13 @@ export async function runAgentAssessment(
       );
     }
 
-    const toolInjectionRaw = await toolInjectionResponse.text();
-    console.log(`Raw tool injection result: ${toolInjectionRaw}`);
-    const cleaned = await parseDirtyJSONWithLLM(toolInjectionRaw);
-
+    const toolInjectionRaw = await toolInjectionResponse.json();
     console.log(
-      `Raw tool injection result: ${JSON.stringify(cleaned, null, 2)}`
+      `Raw tool injection result: ${JSON.stringify(toolInjectionRaw, null, 2)}`
     );
 
-    const parsedToolInjection = ToolsWithVulnerabilitySchema.safeParse(cleaned);
+    const parsedToolInjection =
+      ToolsWithVulnerabilitySchema.safeParse(toolInjectionRaw);
 
     if (parsedToolInjection.error || !parsedToolInjection.success) {
       console.error(
@@ -277,11 +279,12 @@ export async function runAgentAssessment(
 
     // Then run detailed inspections for prompt injection
     console.log("Running prompt injection inspection...");
-    const promptInjectionRequestBody: InspectorAnalysisRequest = {
+    const promptInjectionRequestBody = {
       url: serverUrl,
+      model,
+      analysisType: "prompt_injection" as const,
       ...(apiKey && { bearer: apiKey }),
-      analysisType: "prompt_injection",
-    };
+    } as InspectorAnalysisRequest;
 
     console.log(
       `Sending prompt injection request: ${JSON.stringify({
@@ -299,15 +302,12 @@ export async function runAgentAssessment(
       }
     );
 
-    const promptInjectionRaw = await promptInjectionResponse.text();
+    const promptInjectionRaw = await promptInjectionResponse.json();
     console.log(`Raw prompt injection result: ${promptInjectionRaw}`);
-    const cleanedPromptInjection = await parseDirtyJSONWithLLM(
-      promptInjectionRaw
-    );
 
     console.log(
       `Raw prompt injection result: ${JSON.stringify(
-        cleanedPromptInjection,
+        promptInjectionRaw,
         null,
         2
       )}`
@@ -326,9 +326,8 @@ export async function runAgentAssessment(
       );
     }
 
-    const parsedPromptInjection = ToolsWithVulnerabilitySchema.safeParse(
-      cleanedPromptInjection
-    );
+    const parsedPromptInjection =
+      ToolsWithVulnerabilitySchema.safeParse(promptInjectionRaw);
 
     if (parsedPromptInjection.error || !parsedPromptInjection.success) {
       console.error(
@@ -384,8 +383,9 @@ export async function runAgentAssessment(
                 { Critical: 4, High: 3, Medium: 2, Low: 1 }[mappedSeverity] ||
                 2;
 
+              // Include total tool count in id format: ti-toolIndex-findingIndex-totalTools
               findings.push({
-                id: `ti-${index}-${findingIndex}`,
+                id: `ti-${index}-${findingIndex}-${toolInjectionResult.length}`,
                 toolName: tool.name,
                 severity: mappedSeverity,
                 type: finding.category || "Tool Injection",
@@ -408,7 +408,7 @@ export async function runAgentAssessment(
               analysisText.includes("weakness")
             ) {
               findings.push({
-                id: `ti-${index}`,
+                id: `ti-${index}-0-${toolInjectionResult.length}`,
                 toolName: tool.name,
                 severity: "Medium", // Default severity
                 type: "Tool Injection",
@@ -447,7 +447,7 @@ export async function runAgentAssessment(
               { Critical: 4, High: 3, Medium: 2, Low: 1 }[mappedSeverity] || 2;
 
             findings.push({
-              id: `pi-${index}-${findingIndex}`,
+              id: `pi-${index}-${findingIndex}-${promptInjectionResult.length}`,
               toolName: tool.name,
               severity: mappedSeverity,
               type: finding.category || "Prompt Injection",
