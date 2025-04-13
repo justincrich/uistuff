@@ -488,16 +488,6 @@ export default function SecurityScannerPage() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="context">Additional Context</Label>
-              <Textarea
-                id="context"
-                placeholder="Provide any additional context about your MCP server that might be relevant for the assessment..."
-                className="min-h-[100px]"
-                disabled={isScanning || scanComplete}
-              />
-            </div>
-
             <div className="flex justify-between items-center pt-4">
               <Button
                 variant="outline"
