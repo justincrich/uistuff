@@ -1,0 +1,35 @@
+{
+  "tool_name": "Greet User with Hello",
+  "description": "This tool takes in the name of the user and greets them.",
+  "parameters": [
+    {
+      "name": "name",
+      "type": "string",
+      "required": true,
+      "description": "The name of the user to greet."
+    }
+  ],
+  "vulnerability_analysis": {
+    "score": 2,
+    "findings": [
+      {
+        "category": "hidden_instruction",
+        "description": "The tool does not appear to contain any hidden instructions.",
+        "evidence": "No suspicious patterns or directives found in tool description or parameters.",
+        "severity": "Low"
+      },
+      {
+        "category": "cross_tool_manipulation",
+        "description": "The tool does not seem to manipulate other tools' behavior.",
+        "evidence": "No cross-tool interaction detected.",
+        "severity": "Low"
+      },
+      {
+        "category": "deceptive_behavior",
+        "description": "The tool does not appear to provide false information or encode sensitive data.",
+        "evidence": "No deception techniques detected.",
+        "severity": "Low"
+      }
+    ]
+  }
+}
