@@ -404,7 +404,7 @@ export default function SecurityScannerPage() {
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
           <LogoIcon className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold">MCP Security Scanner</h1>
+          <h1 className="text-3xl font-bold">MCP Inspector</h1>
         </div>
         {(isScanning || scanComplete) && (
           <Button variant="outline" onClick={resetAssessment}>
@@ -435,7 +435,7 @@ export default function SecurityScannerPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="api-key-input">API Key</Label>
+              <Label htmlFor="api-key-input">API Bearer Token</Label>
               <Input
                 id="api-key-input"
                 type="password"
